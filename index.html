@@ -189,6 +189,29 @@ button:disabled{cursor:default}
 @keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
 .anim{animation:pop .35s ease-out both;transform-box:fill-box;transform-origin:bottom center}
 @media (prefers-reduced-motion:reduce){.anim{animation:none}.prog i{transition:none}}
+/* ===== PC（画面幅1000px以上）だけの構成。携帯の表示は変わりません ===== */
+.colL,.colM,.colR{display:contents}
+@media (min-width:1000px){
+  .wrap{max-width:1600px;padding-inline:32px;padding-block:24px 64px}
+  .wrap[data-view="home"]{display:grid;grid-template-columns:minmax(380px,440px) minmax(0,1fr);grid-template-areas:"L M" "L R";column-gap:24px;row-gap:16px;align-items:start}
+  .wrap[data-view="home"] .colL{grid-area:L}
+  .wrap[data-view="home"] .colM{grid-area:M}
+  .wrap[data-view="home"] .colR{grid-area:R}
+  .wrap[data-view="home"] .colL,.wrap[data-view="home"] .colM,.wrap[data-view="home"] .colR{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .wrap[data-view="home"] .colM .grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .wrap[data-view="home"] .tile{padding:13px 14px}
+  .wrap[data-view="quiz"],.wrap[data-view="result"]{max-width:800px}
+  .wrap[data-view="quiz"] .card{padding:26px 28px}
+  .wrap[data-view="quiz"] .qtext{font-size:19px;line-height:1.9}
+  .wrap[data-view="quiz"] .mc button{font-size:16px;padding:12px 16px}
+  .wrap[data-view="quiz"] .ox button{font-size:40px;padding:16px 0}
+  .wrap[data-view="quiz"] .fb p{font-size:15.5px}
+}
+/* 画面幅1280px以上は3カラム：左=今日の学習／中央=分野と模試／右=学習実績。高さがほぼそろい、空白が出ません */
+@media (min-width:1280px){
+  .wrap[data-view="home"]{grid-template-columns:clamp(330px,26vw,370px) minmax(0,1fr) clamp(340px,27vw,390px);grid-template-areas:"L M R"}
+  .wrap[data-view="home"] .colM .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}
 </style>
 
 <div class="wrap" id="app"></div>
@@ -442,7 +465,7 @@ let statTab=(()=>{try{return localStorage.getItem('k4mori-tab')||'rec'}catch(e){
 let view='home', sess=null, confirmReset=false, showBackup=false, backupMsg='';
 const app=document.getElementById('app');
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function render(){view==='home'?renderHome():view==='quiz'?renderQuiz():renderResult()}
+function render(){app.dataset.view=view;view==='home'?renderHome():view==='quiz'?renderQuiz():renderResult()}
 
 function forestSVG(){
   const W=360,H=190; let g='';
@@ -610,7 +633,7 @@ function renderHome(){
   const goalChips=[10,15,20,30].map(g=>`<button class="chip" data-goal="${g}" aria-pressed="${S.goal===g}">${g}問</button>`).join('');
   const tiles=CAT_ORDER.map(c=>{const ids=catIds(c);const m=ids.filter(mastered).length;return `<button class="tile" data-cat="${c}"><span class="weight">${CATS[c].w}</span><b>${CATS[c].name}</b><small>${CATS[c].sub}</small><small>${ids.length}問・定着 ${m}</small><span class="bar"><i style="width:${catScore(c)*100}%"></i></span></button>`}).join('');
   app.innerHTML=`
-  <header class="top">
+  <div class="colL"><header class="top">
     <div class="brand"><h1>甲4の森</h1><p>消防設備士 甲種第4類・筆記／実技対策</p></div>
     <div class="count"><b>${days}</b><span>試験まで（2027/1/11）</span></div>
   </header>
@@ -625,21 +648,21 @@ function renderHome(){
     <div class="sub">復習の期日が来た問題 <b>${nDue}</b>問 ＋ 新しい問題から出題。間違えた問題は翌日にもう一度出ます。</div>
     <div class="chips"><span class="sub">1日の目標</span>${goalChips}</div>
     <div class="chips"><span class="sub">今日の学習に含める</span><button class="chip" data-inc="prac" aria-pressed="${PRACTICAL.every(c=>S.cats.includes(c))}">鑑別・製図（図）</button><button class="chip" data-inc="denki" aria-pressed="${S.cats.includes('denki')}">電気（免除）</button></div>
-  </section>
-  <section class="sect"><h3>分野を選んで解く</h3><div class="grid">${tiles}
+  </section></div>
+  <div class="colM"><section class="sect"><h3>分野を選んで解く</h3><div class="grid">${tiles}
     <button class="tile" id="weak"><span class="weight">復習</span><b>苦手だけ</b><small>間違えてまだ定着していない問題</small><small>${weak}問</small></button>
     <button class="tile wide exam" id="exam"><span><b>本番形式の模試（筆記）</b><br><small>法令8＋7・規格8＝23問（電気免除後の出題数）。各科目40%以上かつ全体60%以上で合格判定。</small></span><span class="weight">23問</span></button>
     <button class="tile wide" id="speed"><span><b>⚡ スピードチャレンジ</b><br><small>60秒で2択を何問正解できるか。自己ベスト ${S.speedBest||0}問</small></span><span class="weight">60秒</span></button>
     <button class="tile wide exam" id="exam2"><span><b>本番形式の模試（実技）</b><br><small>鑑別5問＋製図2問。記述は答えを見て自己採点。60%以上で合格判定。</small></span><span class="weight">7問</span></button>
-  </div></section>
-  <section class="sect"><h3>学習実績</h3>
+  </div></section></div>
+  <div class="colR"><section class="sect"><h3>学習実績</h3>
     <div class="tabs" role="tablist">${[['rec','学習の記録'],['prog','進捗率'],['ach','実績'],['naze','なぜ帳']].map(([k,n])=>`<button role="tab" data-tab="${k}" aria-selected="${statTab===k}">${n}</button>`).join('')}</div>
     ${statsHTML()}${achHTML()}<div class="tabpane" data-pane="naze" ${statTab==='naze'?'':'hidden'}>${statTab==='naze'?nazeHTML():''}</div>
   </section>
   <div class="note">全${ITEMS.length}問：未学習 ${nNew}／学習中 ${nL}／定着 ${nM}（4回連続正解相当）。教科書の「一夜漬け○×ドリル」「模擬テスト①②」に加え、第1〜7章の内容から作った問題と、鑑別・製図の図の問題を収録。図は特徴をわかりやすくした自作の簡略図です。電気の基礎は免除前提のため、今日の学習には含めていません（上のボタンで追加できます）。</div>
   ${backupHTML()}
   <div class="foot"><span id="sync">${syncLabel()}</span>
-    <span class="confirm">${confirmReset?`記録をすべて消しますか？ <button id="resetYes">消す</button><button id="resetNo" style="border-color:var(--line);color:var(--muted)">やめる</button>`:`<button class="linkbtn" id="reset">記録をリセット</button>`}</span></div>`;
+    <span class="confirm">${confirmReset?`記録をすべて消しますか？ <button id="resetYes">消す</button><button id="resetNo" style="border-color:var(--line);color:var(--muted)">やめる</button>`:`<button class="linkbtn" id="reset">記録をリセット</button>`}</span></div></div>`;
   document.getElementById('go').onclick=()=>start('today',todayQueue());
   document.getElementById('weak').onclick=()=>{const q=ITEMS.filter(i=>{const c=S.cards[i.id];return c&&c.ng>0&&c.b<3}).map(i=>i.id);start('weak',shuffle(q).slice(0,20))};
   document.getElementById('exam').onclick=startExam;
