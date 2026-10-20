@@ -212,6 +212,9 @@ button:disabled{cursor:default}
 @media (min-width:1280px){
   .wrap[data-view="home"]{grid-template-columns:clamp(330px,26vw,370px) minmax(0,1fr) clamp(340px,27vw,390px);grid-template-areas:"L M R"}
   .wrap[data-view="home"] .colM .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  /* 3つの列の下端をそろえる：左の「今日の学習」の枠を、空いた分だけ縦に伸ばして中の余白を均等に配分 */
+  .wrap[data-view="home"]{align-items:stretch}
+  .wrap[data-view="home"] .colL>.today{flex:1;justify-content:space-between}
 }
 /* ダーク表示：図（線画）も黒地に明るい線で表示する */
 :root[data-theme="dark"] .fig,:root[data-theme="dark"] .mc.pics button{background:var(--surface);color:var(--ink)}
@@ -485,31 +488,28 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function render(){app.dataset.view=view;view==='home'?renderHome():view==='quiz'?renderQuiz():renderResult()}
 
 function forestSVG(){
-  const W=360,H=190; let g='';
-  // hills
-  g+=`<path d="M0 150 Q90 118 180 140 T360 132 V190 H0Z" fill="var(--ground)"/>`;
-  g+=`<path d="M0 166 Q120 150 240 162 T360 158 V190 H0Z" fill="var(--pine-2)" opacity=".35"/>`;
+  // 高さを約半分（190→100）にし、分野名と%が枠の中に収まるよう描き直し。動物の表示は廃止。
+  const W=360,H=100; let g='';
+  g+=`<path d="M0 72 Q90 58 180 68 T360 64 V100 H0Z" fill="var(--ground)"/>`;
+  g+=`<path d="M0 82 Q120 74 240 80 T360 78 V100 H0Z" fill="var(--pine-2)" opacity=".35"/>`;
   TREE_CATS.forEach((c,i)=>{
-    const s=catScore(c), x=30+i*50, base=160+((i%2)?-4:4);
-    const h=14+s*90, r=7+s*22;
+    const s=catScore(c), x=30+i*50, base=68+((i%2)?-2:2);
+    const h=8+s*38, r=4+s*9.5;
     g+=`<g class="anim" style="animation-delay:${i*70}ms">`;
-    g+=`<rect x="${x-2-s*2}" y="${base-h*0.42}" width="${4+s*4}" height="${h*0.42}" rx="2" fill="var(--trunk)"/>`;
-    if(s<0.04){g+=`<path d="M${x} ${base-8} q-9 -6 -10 -14 q9 1 10 10 q1 -9 10 -10 q-1 8 -10 14z" fill="var(--leaf)"/>`}
+    g+=`<rect x="${x-1.5-s*1.5}" y="${base-h*0.42}" width="${3+s*3}" height="${h*0.42}" rx="1.5" fill="var(--trunk)"/>`;
+    if(s<0.04){g+=`<path d="M${x} ${base-4} q-5 -3 -6 -8 q5 1 6 6 q1 -5 6 -6 q-1 4 -6 8z" fill="var(--leaf)"/>`}
     else{
       const n=s>0.66?3:s>0.33?2:1;
       for(let k=0;k<n;k++){const yy=base-h*0.38-k*r*0.75, rr=r*(1-k*0.22);
         g+=`<path d="M${x-rr} ${yy} L${x} ${yy-rr*1.5} L${x+rr} ${yy}Z" fill="${k%2?'var(--pine-2)':'var(--pine)'}"/>`}
-      if(s>=0.9) g+=`<circle cx="${x}" cy="${base-h*0.38-(n-1)*r*0.75-r*1.5-4}" r="3.5" fill="var(--gold)"/>`;
+      if(s>=0.9) g+=`<circle cx="${x}" cy="${base-h*0.38-(n-1)*r*0.75-r*1.5-3}" r="2.5" fill="var(--gold)"/>`;
     }
     g+=`</g>`;
-    g+=`<text x="${x}" y="${base+20}" text-anchor="middle" font-size="9.5" fill="var(--ink)" font-family="var(--body)">${CATS[c].short}</text>`;
-    g+=`<text x="${x}" y="${base+31}" text-anchor="middle" font-size="9" fill="var(--muted)" font-family="var(--body)">${Math.round(s*100)}%</text>`;
+    g+=`<text x="${x}" y="${base+14}" text-anchor="middle" font-size="9" fill="var(--ink)" font-family="var(--body)">${CATS[c].short}</text>`;
+    g+=`<text x="${x}" y="${base+25}" text-anchor="middle" font-size="8" fill="var(--muted)" font-family="var(--body)">${Math.round(s*100)}%</text>`;
   });
-  const animals=[[50,'🐿️',14,60],[150,'🐦',300,40],[300,'🦉',196,72],[600,'🦊',112,150],[1000,'🦌',250,150]];
-  animals.forEach(([t,e,x,y])=>{if((S.total||0)>=t) g+=`<text x="${x}" y="${y}" font-size="18" class="anim">${e}</text>`});
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="分野ごとの木。定着度に応じて育ちます">${g}</svg>`;
 }
-function nextAnimal(){const t=[50,150,300,600,1000].find(x=>(S.total||0)<x);return t?`あと${t-(S.total||0)}問で新しい仲間`:'森の仲間がそろいました'}
 
 function timeChart(){
   const W=340,H=176,L=34,R=8,T=24,B=26, n=7;
@@ -656,7 +656,7 @@ function renderHome(){
   </header>
   ${levelHTML()}
   <section class="scene" aria-label="あなたの森">${forestSVG()}
-    <div class="meta"><span>連続 <b>${streak()}</b>日</span><span>累計 <b>${S.total||0}</b>問</span><span>${nextAnimal()}</span></div>
+    <div class="meta"><span>連続 <b>${streak()}</b>日</span><span>累計 <b>${S.total||0}</b>問</span></div>
   </section>
   <section class="today">
     <div class="row"><h2>今日の学習</h2><span class="sub" style="font-variant-numeric:tabular-nums">${tc} / ${S.goal}問</span></div>
