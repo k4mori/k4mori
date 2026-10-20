@@ -40,7 +40,8 @@ button:focus-visible{outline:3px solid var(--alarm);outline-offset:2px}
 .brand p{margin:0;font-size:12px;color:var(--muted)}
 .count{text-align:right;font-family:var(--display)}
 .count b{font-size:30px;color:var(--alarm);font-variant-numeric:tabular-nums;line-height:1}
-.count span{display:block;font-size:11px;color:var(--muted)}
+.count b small{font-size:17px;margin-left:2px}
+.count span{display:block;font-size:14px;color:var(--muted);margin-top:4px;white-space:nowrap}
 .scene{border-radius:18px;overflow:hidden;background:var(--sky);border:1px solid var(--line)}
 .scene svg{display:block;width:100%;height:auto}
 .scene .meta{display:flex;justify-content:space-between;gap:8px;padding:8px 14px;font-size:12px;color:var(--muted);background:var(--surface);border-top:1px solid var(--line);flex-wrap:wrap}
@@ -190,6 +191,20 @@ button:disabled{cursor:default}
 @keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
 .anim{animation:pop .35s ease-out both;transform-box:fill-box;transform-origin:bottom center}
 @media (prefers-reduced-motion:reduce){.anim{animation:none}.prog i{transition:none}}
+/* 学習の記録・進捗率・なぜ帳 */
+.nzbox>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 14px}
+.nzbox>summary::-webkit-details-marker{display:none}
+.nzbox>summary h3{margin:0;color:var(--ink)}
+.nzbox>summary::after{content:'開く';font-size:12px;color:var(--muted)}
+.nzbox[open]>summary{margin-bottom:10px}
+.nzbox[open]>summary::after{content:'閉じる'}
+/* 進捗率の表は詰めて表示 */
+.sect-prog .rtable td,.sect-prog .rtable th{padding:4px 4px}
+.sect-prog .stats{gap:10px}
+.sect-prog .rtable td:first-child{white-space:nowrap}
+.top .brand p{white-space:nowrap}
+/* 携帯では、分野を選ぶ欄を進捗率より先に表示 */
+@media (max-width:999px){.sect-prog,.colR>*{order:1}}
 /* ===== PC（画面幅1000px以上）だけの構成。携帯の表示は変わりません ===== */
 .colL,.colM,.colR{display:contents}
 @media (min-width:1000px){
@@ -210,11 +225,14 @@ button:disabled{cursor:default}
 }
 /* 画面幅1280px以上は3カラム：左=今日の学習／中央=分野と模試／右=学習実績。高さがほぼそろい、空白が出ません */
 @media (min-width:1280px){
-  .wrap[data-view="home"]{grid-template-columns:clamp(330px,26vw,370px) minmax(0,1fr) clamp(340px,27vw,390px);grid-template-areas:"L M R"}
+  .wrap[data-view="home"]{grid-template-columns:clamp(360px,27vw,390px) minmax(0,1fr) clamp(330px,26vw,390px);grid-template-areas:"L M R"}
+  .wrap[data-view="home"] .top .brand p{font-size:11px}
   .wrap[data-view="home"] .colM .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
-  /* 3つの列の下端をそろえる：左の「今日の学習」の枠を、空いた分だけ縦に伸ばして中の余白を均等に配分 */
+  /* 3つの列の下端をそろえる：左の列の最後（進捗率）を、空いた分だけ縦に伸ばす */
   .wrap[data-view="home"]{align-items:stretch}
-  .wrap[data-view="home"] .colL>.today{flex:1;justify-content:space-between}
+  .wrap[data-view="home"] .colL>.sect-prog{flex:1;display:flex;flex-direction:column}
+  .wrap[data-view="home"] .colL>.sect-prog .tabpane,.wrap[data-view="home"] .colL>.sect-prog .stats{flex:1}
+  .wrap[data-view="home"] .colL>.sect-prog .stats{justify-content:space-around}
 }
 /* ダーク表示：図（線画）も黒地に明るい線で表示する */
 :root[data-theme="dark"] .fig,:root[data-theme="dark"] .mc.pics button{background:var(--surface);color:var(--ink)}
@@ -437,12 +455,11 @@ const ACH=[
 let toastQ=[],toastOn=false;
 function toast(msg){toastQ.push(msg);if(!toastOn)showToast()}
 function showToast(){const m=toastQ.shift();if(!m){toastOn=false;return}toastOn=true;const d=document.createElement('div');d.className='toast';d.setAttribute('role','status');d.textContent=m;document.body.appendChild(d);setTimeout(()=>{d.remove();showToast()},2300)}
-function unlock(key){S.ach=S.ach||{};if(!S.ach[key]){S.ach[key]=dayKey(TODAY);const a=ACH.find(x=>x[0]===key);if(a)toast(a[1]+' 実績「'+a[2]+'」を達成！');persist()}}
+function unlock(key){S.ach=S.ach||{};if(!S.ach[key]){S.ach[key]=dayKey(TODAY);const a=ACH.find(x=>x[0]===key);persist()}}
 function checkAch(){ACH.forEach(([k,,,f])=>{try{if(f())unlock(k)}catch(e){}})}
 function gainXp(ok,combo){
   const before=lvFromXp(S.xp||0); const g=ok?10+Math.min(Math.max(combo-1,0),10):2;
   S.xp=(S.xp||0)+g; const after=lvFromXp(S.xp);
-  if(after>before) toast('🎉 レベル'+after+'！ 称号「'+titleOf(after)+'」');
   if(new Date().getHours()<7) unlock('early');
   checkAch(); return g;
 }
@@ -481,6 +498,7 @@ function todayQueue(){
 }
 
 // ---------- views ----------
+let nazeOpen=false;
 let statTab=(()=>{try{return localStorage.getItem('k4mori-tab')||'rec'}catch(e){return 'rec'}})();
 let view='home', sess=null, confirmReset=false, showBackup=false, backupMsg='';
 const app=document.getElementById('app');
@@ -538,13 +556,13 @@ function donut(){
     <text x="60" y="58" text-anchor="middle" font-size="19" font-weight="700" fill="var(--ink)" font-family="var(--display)">${pct}%</text>
     <text x="60" y="76" text-anchor="middle" font-size="9.5" fill="var(--muted)">一度以上解いた</text></svg>`;
 }
-function statsHTML(){
+function statsHTML(part){
   const today=(S.time[dayKey(TODAY)]||0);
   const tchips=[15,30,60,90].map(g=>`<button class="chip" data-tgoal="${g}" aria-pressed="${(S.tgoal||30)===g}">${fmtHM(g*60)}</button>`).join('');
   const m=ITEMS.filter(i=>mastered(i.id)).length, l=ITEMS.filter(i=>!isNew(i.id)&&!mastered(i.id)).length, nw=ITEMS.length-m-l;
   const rows=CAT_ORDER.map(c=>{let ok=0,ng=0;catIds(c).forEach(id=>{const x=S.cards[id];if(x){ok+=x.ok;ng+=x.ng}});const r=ok+ng?ok/(ok+ng):null;
-    return `<tr><td>${CATS[c].name}</td><td><span class="mini"><i style="width:${r==null?0:r*100}%;background:${r==null?'transparent':r>=.6?'var(--pine)':'var(--alarm)'}"></i></span></td><td>${r==null?'—':Math.round(r*1000)/10+'%'}</td></tr>`}).join('');
-  return `<div class="tabpane" data-pane="rec" ${statTab==='rec'?'':'hidden'}>
+    return `<tr><td>${CATS[c].short}</td><td><span class="mini"><i style="width:${r==null?0:r*100}%;background:${r==null?'transparent':r>=.6?'var(--pine)':'var(--alarm)'}"></i></span></td><td>${r==null?'—':Math.round(r*1000)/10+'%'}</td></tr>`}).join('');
+  const recH=`<div class="tabpane" data-pane="rec">
    <div class="stats">
     <div class="kpis">
       <div><span>連続学習日数</span><b>${streak()}<small>日</small></b></div>
@@ -555,13 +573,14 @@ function statsHTML(){
     <div class="chartbox">${timeChart()}</div>
     <div class="chips"><span class="sub">1日の時間目標</span>${tchips}</div>
     <div class="sub">時間は問題を解いて解説を読んでいる間だけ数えます。1回の操作は最大2分まで、アプリを閉じている間は止まります。</div>
-   </div></div>
-   <div class="tabpane" data-pane="prog" ${statTab==='prog'?'':'hidden'}>
+   </div></div>`;
+  const progH=`<div class="tabpane" data-pane="prog">
    <div class="stats">
     <div class="prow">${donut()}
       <ul class="legend"><li><i style="background:var(--pine)"></i>定着 <b>${m}</b>問</li><li><i style="background:var(--leaf)"></i>学習中 <b>${l}</b>問</li><li><i style="background:var(--line)"></i>未学習 <b>${nw}</b>問</li></ul></div>
     <table class="rtable cat"><thead><tr><th>分野別の正答率</th><th></th><th>累計</th></tr></thead><tbody>${rows}</tbody></table>
    </div></div>`;
+  return part==='prog'?progH:part==='rec'?recH:recH+progH;
 }
 function enc(o){return btoa(unescape(encodeURIComponent(JSON.stringify(o))))}
 function dec(t){return JSON.parse(decodeURIComponent(escape(atob(t.replace(/\s+/g,'')))))}
@@ -629,7 +648,7 @@ function bindNaze(){
     const due=q.filter(id=>isDue(id)||isNew(id)), rest=q.filter(id=>!due.includes(id)); start('nz:'+n, shuffle(due).concat(shuffle(rest)).slice(0,15))});
   nazeFilter();
 }
-function levelHTML(){
+function levelHTML(){ return '';
   const x=S.xp||0, L=lvFromXp(x), lo=xpAt(L), hi=xpAt(L+1), next=TITLES.find(t=>t[0]>L);
   return `<section class="lv" aria-label="レベル"><div class="badge"><div><small>Lv.</small><b>${L}</b></div></div>
     <div class="info"><strong>${titleOf(L)}</strong><div class="xpbar"><i style="width:${(x-lo)/(hi-lo)*100}%"></i></div>
@@ -652,30 +671,24 @@ function renderHome(){
   app.innerHTML=`
   <div class="colL"><header class="top">
     <div class="brand"><h1>甲4の森</h1><p>消防設備士 甲種第4類・筆記／実技対策</p></div>
-    <div class="count"><b>${days}</b><span>試験まで（2027/1/11）</span></div>
+    <div class="count"><b>${days}<small>日</small></b><span>試験まで（2027/1/11）</span></div>
   </header>
   ${levelHTML()}
-  <section class="scene" aria-label="あなたの森">${forestSVG()}
-    <div class="meta"><span>連続 <b>${streak()}</b>日</span><span>累計 <b>${S.total||0}</b>問</span></div>
-  </section>
   <section class="today">
     <div class="row"><h2>今日の学習</h2><span class="sub" style="font-variant-numeric:tabular-nums">${tc} / ${S.goal}問</span></div>
-    <div class="prog"><i style="width:${pct}%"></i></div>
     <button class="big" id="go">${tc>=S.goal?'目標達成。もう少し進める':'今日の学習を始める'}</button>
-    <div class="sub">復習の期日が来た問題 <b>${nDue}</b>問 ＋ 新しい問題から出題。間違えた問題は翌日にもう一度出ます。</div>
     <div class="chips"><span class="sub">1日の目標</span>${goalChips}</div>
     <div class="chips"><span class="sub">今日の学習に含める</span><button class="chip" data-inc="prac" aria-pressed="${PRACTICAL.every(c=>S.cats.includes(c))}">鑑別・製図（図）</button><button class="chip" data-inc="denki" aria-pressed="${S.cats.includes('denki')}">電気（免除）</button></div>
-  </section></div>
+  </section>
+  <section class="sect sect-prog"><h3>進捗率</h3>${statsHTML('prog')}</section></div>
   <div class="colM"><section class="sect"><h3>分野を選んで解く</h3><div class="grid">${tiles}
     <button class="tile" id="weak"><span class="weight">復習</span><b>苦手だけ</b><small>間違えてまだ定着していない問題</small><small>${weak}問</small></button>
     <button class="tile wide exam" id="exam"><span><b>本番形式の模試（筆記）</b><br><small>法令8＋7・規格8＝23問（電気免除後の出題数）。各科目40%以上かつ全体60%以上で合格判定。</small></span><span class="weight">23問</span></button>
     <button class="tile wide" id="speed"><span><b>⚡ スピードチャレンジ</b><br><small>60秒で2択を何問正解できるか。自己ベスト ${S.speedBest||0}問</small></span><span class="weight">60秒</span></button>
     <button class="tile wide exam" id="exam2"><span><b>本番形式の模試（実技）</b><br><small>鑑別5問＋製図2問。記述は答えを見て自己採点。60%以上で合格判定。</small></span><span class="weight">7問</span></button>
   </div></section></div>
-  <div class="colR"><section class="sect"><h3>学習実績</h3>
-    <div class="tabs" role="tablist">${[['rec','学習の記録'],['prog','進捗率'],['ach','実績'],['naze','なぜ帳']].map(([k,n])=>`<button role="tab" data-tab="${k}" aria-selected="${statTab===k}">${n}</button>`).join('')}</div>
-    ${statsHTML()}${achHTML()}<div class="tabpane" data-pane="naze" ${statTab==='naze'?'':'hidden'}>${statTab==='naze'?nazeHTML():''}</div>
-  </section>
+  <div class="colR"><section class="sect"><h3>学習の記録</h3>${statsHTML('rec')}</section>
+  <details class="sect nzbox" id="nzbox" ${nazeOpen?'open':''}><summary><h3>なぜ帳（法令と機器のなぜ）</h3></summary><div id="nzbody">${nazeOpen?nazeHTML():''}</div></details>
   <div class="note">全${ITEMS.length}問：未学習 ${nNew}／学習中 ${nL}／定着 ${nM}（4回連続正解相当）。教科書の「一夜漬け○×ドリル」「模擬テスト①②」に加え、第1〜7章の内容から作った問題と、鑑別・製図の図の問題を収録。図は特徴をわかりやすくした自作の簡略図です。電気の基礎は免除前提のため、今日の学習には含めていません（上のボタンで追加できます）。</div>
   ${themeHTML()}${backupHTML()}
   <div class="foot"><span id="sync">${syncLabel()}</span>
@@ -692,11 +705,9 @@ function renderHome(){
   app.querySelectorAll('[data-goal]').forEach(b=>b.onclick=()=>{S.goal=+b.dataset.goal;persist();render()});
   bindBackup();
   app.querySelectorAll('[data-theme-set]').forEach(b=>b.onclick=()=>setTheme(b.dataset.themeSet));
-  app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{statTab=b.dataset.tab;try{localStorage.setItem('k4mori-tab',statTab)}catch(e){}
-    app.querySelectorAll('[data-tab]').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===statTab));
-    app.querySelectorAll('[data-pane]').forEach(p=>p.hidden=p.dataset.pane!==statTab);
-    const np=app.querySelector('[data-pane=naze]'); if(statTab==='naze'&&!np.innerHTML){np.innerHTML=nazeHTML();bindNaze()}});
-  if(statTab==='naze') bindNaze();
+  const nzb=document.getElementById('nzbox');
+  nzb.ontoggle=()=>{nazeOpen=nzb.open; if(nazeOpen){const b=document.getElementById('nzbody'); if(!b.innerHTML){b.innerHTML=nazeHTML();bindNaze()}}};
+  if(nazeOpen) bindNaze();
   const r=document.getElementById('reset'); if(r) r.onclick=()=>{confirmReset=true;render()};
   const y=document.getElementById('resetYes'); if(y) y.onclick=()=>{S=blank();S.rst=Date.now();confirmReset=false;persist();render()};
   const n=document.getElementById('resetNo'); if(n) n.onclick=()=>{confirmReset=false;render()};
@@ -744,7 +755,7 @@ function renderQuiz(){
   if(a!=null&&!exam&&sess.mode!=='speed'){
     const ok=it.t==='sa'?a===1:a===it.a; const ans=it.t==='ox'?(it.a?'○（正しい）':'×（誤り）'):it.t==='sa'?(ok?'自己採点：できた':'自己採点：まちがえた'):'正解は '+'①②③④'[it.a];
     const ex=it.ex||(it.t==='ox'&&it.a?'この文のとおりです。':'');
-    fb=`<div class="fb ${ok?'good':'bad'}" role="status"><h3>${ok?'正解':'不正解'}　<span style="font-size:14px">${ans}</span><span class="gain">+${sess.gain||0} XP</span></h3>${ex?`<p>${esc(ex)}</p>`:''}<span class="src">出典：教科書 ${esc(it.src)}</span></div>`;
+    fb=`<div class="fb ${ok?'good':'bad'}" role="status"><h3>${ok?'正解':'不正解'}　<span style="font-size:14px">${ans}</span></h3>${ex?`<p>${esc(ex)}</p>`:''}<span class="src">出典：教科書 ${esc(it.src)}</span></div>`;
     const nc=it.nz&&nzCard(it.nz);
     if(nc) fb+=`<details class="nz nzlink" ${ok?'':'open'}><summary><span class="nzno">💡</span><span class="nzt">なぜ帳 ${String(nc.n).padStart(2,'0')}　${esc(nc.t)}</span></summary>${nzFields(nc)}</details>`;
   }
@@ -840,10 +851,9 @@ function renderResult(){
       ${verdict.why.length?`<ul class="why">${verdict.why.map(w=>`<li>${w}</li>`).join('')}</ul>`:''}
     </div>${body}${levelHTML()}`:`${levelHTML()}
     <div class="score">${ok}<span style="font-size:22px;color:var(--muted)"> / ${r.length}</span></div>
-    <div class="scene">${forestSVG()}</div>
     ${body}`}
     ${wrong.length?`<details class="card" ${wrong.length<=6?'open':''}><summary style="font-family:var(--display);font-weight:700;text-align:left;cursor:pointer">間違えた問題 ${wrong.length}問（明日また出ます）</summary><ul style="padding-left:18px;margin:10px 0 0">${wl}</ul></details>`:''}
-    <button class="big" id="home">森に戻る</button>
+    <button class="big" id="home">ホームに戻る</button>
   </div>`;
   document.getElementById('home').onclick=()=>{view='home';render();window.scrollTo(0,0)};
 }
